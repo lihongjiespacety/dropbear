@@ -205,12 +205,12 @@ int buf_rsa_verify(buffer * buf, const dropbear_rsa_key *key, const buffer *data
 	m_mp_init_multi(&rsa_mdash, &rsa_s, &rsa_em, NULL);
 
 	slen = buf_getint(buf);
-	if (slen != (unsigned int)mp_unsigned_bin_size(key->n)) {
+	if (slen != (unsigned int)mp_ubin_size(key->n)) {
 		TRACE(("bad size"))
 		goto out;
 	}
 
-	if (mp_read_unsigned_bin(&rsa_s, buf_getptr(buf, buf->len - buf->pos),
+	if (mp_from_ubin(&rsa_s, buf_getptr(buf, buf->len - buf->pos),
 				buf->len - buf->pos) != MP_OKAY) {
 		TRACE(("failed reading rsa_s"))
 		goto out;
@@ -249,6 +249,7 @@ out:
 void buf_put_rsa_sign(buffer* buf, const dropbear_rsa_key *key, const buffer *data_buf) {
 	unsigned int nsize, ssize;
 	unsigned int i;
+	size_t written;
 	DEF_MP_INT(rsa_s);
 	DEF_MP_INT(rsa_tmp1);
 	DEF_MP_INT(rsa_tmp2);
@@ -313,21 +314,21 @@ void buf_put_rsa_sign(buffer* buf, const dropbear_rsa_key *key, const buffer *da
 	/* create the signature to return */
 	buf_putstring(buf, SSH_SIGNKEY_RSA, SSH_SIGNKEY_RSA_LEN);
 
-	nsize = mp_unsigned_bin_size(key->n);
+	nsize = mp_ubin_size(key->n);
 
 	/* string rsa_signature_blob length */
 	buf_putint(buf, nsize);
 	/* pad out s to same length as n */
-	ssize = mp_unsigned_bin_size(&rsa_s);
+	ssize = mp_ubin_size(&rsa_s);
 	dropbear_assert(ssize <= nsize);
 	for (i = 0; i < nsize-ssize; i++) {
 		buf_putbyte(buf, 0x00);
 	}
 
-	if (mp_to_unsigned_bin(&rsa_s, buf_getwriteptr(buf, ssize)) != MP_OKAY) {
+	if (mp_to_ubin(&rsa_s, buf_getwriteptr(buf, ssize), ssize, &written) != MP_OKAY) {
 		dropbear_exit("RSA error");
 	}
-	buf_incrwritepos(buf, ssize);
+	buf_incrwritepos(buf, written);
 	mp_clear(&rsa_s);
 
 #if defined(DEBUG_RSA) && DEBUG_TRACE
@@ -366,7 +367,7 @@ static void rsa_pad_em(const dropbear_rsa_key * key,
 	unsigned int nsize;
 	
 	dropbear_assert(key != NULL);
-	nsize = mp_unsigned_bin_size(key->n);
+	nsize = mp_ubin_size(key->n);
 
 	rsa_EM = buf_new(nsize-1);
 	/* type byte */
